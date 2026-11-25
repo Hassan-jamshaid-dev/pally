@@ -14,8 +14,12 @@ export type Preferences = {
   onboarded: boolean;
   voiceEnabled: boolean; // read steps aloud
   pace: SpeechPace;
+  textSize: 'standard' | 'large' | 'xl';
+  highContrast: boolean;
+  buttonSize: 'standard' | 'larger';
+  trusted: { id: string; name: string; phone: string; relation: string }[];
 };
-export const DEFAULT_PREFS: Preferences = { onboarded: false, voiceEnabled: true, pace: 'slow' };
+export const DEFAULT_PREFS: Preferences = { onboarded: false, voiceEnabled: true, pace: 'slow', textSize: 'standard', highContrast: false, buttonSize: 'standard', trusted: [] };
 
 export type HistoryEntry = {
   id: string;
@@ -99,3 +103,4 @@ export function createStorage(kv: KeyValueStore) {
     },
   };
 }
+

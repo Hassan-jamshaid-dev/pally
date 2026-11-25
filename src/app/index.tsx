@@ -1,17 +1,22 @@
-import { Image } from 'expo-image';
 import { Redirect, useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, type } from '@/constants/theme';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { colors } from '@/constants/theme';
+import { AppText as Text } from '@/presentation/components/app-text';
 import { BigButton } from '@/presentation/components/big-button';
+import { Mascot, Screen } from '@/presentation/components/screen';
 import { usePally } from '@/presentation/pally-context';
+
+const SIZES = [
+  { key: 'standard', label: 'Standard', size: 20 },
+  { key: 'large', label: 'Large', size: 26 },
+  { key: 'xl', label: 'Extra Large', size: 32 },
+] as const;
 
 export default function Welcome() {
   const router = useRouter();
   const { ready, prefs, updatePrefs } = usePally();
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.cream }} />;
-  // Welcome is only shown on first launch.
   if (prefs.onboarded) return <Redirect href="/home" />;
 
   const start = async () => {
@@ -20,24 +25,51 @@ export default function Welcome() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <Screen>
       <View style={styles.top}>
-        <Image source={require('../../assets/images/pally-logo.png')} style={styles.logo} contentFit="contain" accessibilityLabel="Pally logo" />
-        <Text style={styles.title} accessibilityRole="header">Hi, I'm Pally.</Text>
-        <Text style={styles.body}>I help you with your phone. Just ask me out loud, or type if you prefer. I go one small step at a time.</Text>
-        <Text style={styles.body}>When you tap the microphone, your phone will ask to use it. That is only so I can hear you.</Text>
-        <Text style={styles.small}>No account needed.</Text>
+        <Mascot size={150} />
+        <Text style={styles.title} accessibilityRole="header">Hello! I'm Pally.</Text>
+        <Text style={styles.body}>I'm here to help you use your phone, one step at a time.</Text>
       </View>
-      <BigButton label="Get started" onPress={start} />
-    </SafeAreaView>
+      <View style={styles.card}>
+        {['Ask questions by speaking', 'Get simple, step-by-step instructions', 'Ask the same question as many times as you need'].map((t) => (
+          <View key={t} style={styles.row}>
+            <Text style={styles.check}>✓</Text>
+            <Text style={styles.rowText}>{t}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.label}>Choose your text size:</Text>
+      <View style={styles.sizes}>
+        {SIZES.map((s) => {
+          const on = prefs.textSize === s.key;
+          return (
+            <Pressable key={s.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={s.label + ' text'} onPress={() => updatePrefs({ textSize: s.key })} style={[styles.size, on && styles.sizeOn]}>
+              <Text style={[styles.aa, { fontSize: s.size, color: colors.tealDark }]}>Aa</Text>
+              <Text style={styles.sizeLabel}>{s.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={styles.small}>No account needed. When you tap the microphone, your phone will ask to use it, only so I can hear you.</Text>
+      <BigButton label="Let's Get Started" onPress={start} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream, padding: 24, justifyContent: 'space-between' },
-  top: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  logo: { width: 260, height: 170 },
-  title: { fontSize: type.hero, fontWeight: '900', color: colors.teal, textAlign: 'center' },
-  body: { fontSize: type.body, lineHeight: 32, color: colors.text, textAlign: 'center' },
-  small: { fontSize: 20, fontWeight: '700', color: colors.coralDark },
+  top: { alignItems: 'center', gap: 8 },
+  title: { fontSize: 34, fontWeight: '900', color: colors.teal, textAlign: 'center' },
+  body: { fontSize: 20, lineHeight: 28, color: colors.text, textAlign: 'center' },
+  card: { backgroundColor: colors.card, borderRadius: 24, padding: 16, gap: 10 },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  check: { fontSize: 20, color: colors.white, backgroundColor: colors.sageDeep, width: 30, height: 30, borderRadius: 15, textAlign: 'center', fontWeight: '900', overflow: 'hidden' },
+  rowText: { flex: 1, fontSize: 18, color: colors.text },
+  label: { fontSize: 20, fontWeight: '800', color: colors.tealDark },
+  sizes: { flexDirection: 'row', gap: 10 },
+  size: { flex: 1, minHeight: 84, backgroundColor: colors.card, borderRadius: 18, borderWidth: 3, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: 6 },
+  sizeOn: { borderColor: colors.teal, backgroundColor: colors.greenSoft },
+  aa: { fontWeight: '900' },
+  sizeLabel: { fontSize: 14, color: colors.text, fontWeight: '700' },
+  small: { fontSize: 16, color: colors.muted, textAlign: 'center' },
 });

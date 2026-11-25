@@ -33,6 +33,7 @@ export type GuidanceAction =
   | { type: 'ack_warning' }
   | { type: 'next' }
   | { type: 'repeat' }
+  | { type: 'previous' }
   | { type: 'confirm' }
   | { type: 'decline' }
   | { type: 'stop' }
@@ -79,6 +80,8 @@ export function guidanceReducer(state: GuidanceState, action: GuidanceAction): G
     case 'next':
       // Cannot advance past an unconfirmed gate.
       return state.status === 'step' ? enterStep(state, state.index + 1) : state;
+    case 'previous':
+      return state.status === 'step' && state.index > 0 ? enterStep(state, state.index - 1) : state;
     case 'repeat':
       return state.status === 'step' || state.status === 'step_confirm'
         ? { ...state, speakNonce: state.speakNonce + 1 }
@@ -107,3 +110,4 @@ function uniqueId(id: string, kept: GuidanceStep[], i: number): string {
 export const currentStep = (s: GuidanceState): GuidanceStep | null => s.steps[s.index] ?? null;
 export const isActive = (s: GuidanceState) => s.status === 'step' || s.status === 'step_confirm' || s.status === 'task_warning';
 export const progressLabel = (s: GuidanceState) => `Step ${Math.min(s.index + 1, s.steps.length)} of ${s.steps.length}`;
+

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { AppText as Text } from './components/app-text';
 import type { GuidanceStep } from '@/ai/schema';
 import { describeDevice, oemNote } from '@/android/deviceInfo';
 import { getDeviceInfo, openSettingsScreen } from '@/android/device';
@@ -65,3 +66,4 @@ const styles = StyleSheet.create({
   text: { fontSize: 20, lineHeight: 29, color: colors.text },
   small: { fontSize: 17, lineHeight: 24, color: '#3C5654' },
 });
+

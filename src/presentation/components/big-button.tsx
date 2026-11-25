@@ -1,5 +1,7 @@
-import { Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
-import { colors, MIN_TARGET, type } from '@/constants/theme';
+import { Pressable, StyleSheet, type ViewStyle } from 'react-native';
+import { colors, type } from '@/constants/theme';
+import { AppText } from './app-text';
+import { useTheme } from '../use-theme';
 
 type Props = {
   label: string;
@@ -10,6 +12,9 @@ type Props = {
 };
 
 export function BigButton({ label, onPress, variant = 'primary', style, disabled }: Props) {
+  const { c, target, contrast } = useTheme();
+  const bg = { primary: c.teal, secondary: c.card, warm: c.coral, danger: c.coralDark }[variant];
+  const fg = variant === 'secondary' ? c.teal : variant === 'warm' ? c.tealDark : colors.white;
   return (
     <Pressable
       accessibilityRole="button"
@@ -17,21 +22,22 @@ export function BigButton({ label, onPress, variant = 'primary', style, disabled
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.base, styles[variant], pressed && styles.pressed, disabled && styles.disabled, style]}>
-      <Text style={[styles.text, variant === 'secondary' && { color: colors.teal }, variant === 'warm' && { color: colors.tealDark }]}>
-        {label}
-      </Text>
+      style={({ pressed }) => [
+        styles.base,
+        { minHeight: target, backgroundColor: bg },
+        variant === 'secondary' && { borderWidth: contrast ? 3 : 2, borderColor: contrast ? '#000' : c.sage },
+        pressed && styles.pressed,
+        disabled && styles.disabled,
+        style,
+      ]}>
+      <AppText style={[styles.text, { color: fg }]}>{label}</AppText>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { minHeight: MIN_TARGET + 8, borderRadius: 36, paddingHorizontal: 28, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
-  primary: { backgroundColor: colors.teal },
-  secondary: { backgroundColor: colors.white, borderWidth: 3, borderColor: colors.teal },
-  warm: { backgroundColor: colors.coral },
-  danger: { backgroundColor: colors.coralDark },
+  base: { borderRadius: 36, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch', elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.45 },
-  text: { fontSize: type.button, fontWeight: '800', color: colors.white },
+  text: { fontSize: type.button - 2, fontWeight: '800', textAlign: 'center' },
 });

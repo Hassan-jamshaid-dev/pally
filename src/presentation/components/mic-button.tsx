@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from './app-text';
 import { colors } from '@/constants/theme';
 
 export type MicState = 'idle' | 'listening' | 'thinking' | 'speaking';
@@ -56,6 +57,7 @@ export function MicButton({ state, onPress, compact, hideLabel }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={{ width: size + 40, height: size + 40, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', width: size + 36, height: size + 36, borderRadius: (size + 36) / 2, backgroundColor: colors.peach, opacity: 0.55 }} />
         <Animated.View style={[styles.ring, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg, opacity, transform: [{ scale }] }]} />
         <Pressable
           accessibilityRole="button"
@@ -105,6 +107,7 @@ function SpeakerIcon({ color, scale }: { color: string; scale: number }) {
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', gap: 8 },
   ring: { position: 'absolute' },
-  mic: { alignItems: 'center', justifyContent: 'center', borderWidth: 6, borderColor: colors.white, elevation: 8 },
+  mic: { alignItems: 'center', justifyContent: 'center', borderWidth: 8, borderColor: colors.peachSoft, elevation: 8, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12 },
   label: { fontSize: 26, fontWeight: '800', color: colors.teal, textAlign: 'center' },
 });
+

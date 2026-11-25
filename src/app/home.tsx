@@ -1,86 +1,97 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { colors } from '@/constants/theme';
+import { AppText as Text } from '@/presentation/components/app-text';
 import { BigButton } from '@/presentation/components/big-button';
 import { MicButton } from '@/presentation/components/mic-button';
 import { Notice } from '@/presentation/components/notice';
+import { Mascot, Screen, mascot } from '@/presentation/components/screen';
 import { usePally } from '@/presentation/pally-context';
+import { useTheme } from '@/presentation/use-theme';
 import { useSpeechInput } from '@/voice/useSpeechInput';
 
 export default function Home() {
   const router = useRouter();
+  const { c } = useTheme();
   const { resumable, resume, discardResumable, history, ready } = usePally();
   const speech = useSpeechInput((text) => router.push({ pathname: '/ask', params: { q: text } }));
+  const recent = history[0];
 
-  const openAsk = () => router.push('/ask');
-  const recent = history.slice(0, 1)[0];
+  const cards = [
+    { label: 'Past Help', glyph: '↺', go: () => router.push('/history') },
+    { label: 'Settings', glyph: '⚙', go: () => router.push('/settings') },
+    { label: 'Type Instead', glyph: '⌨', go: () => router.push('/ask') },
+  ];
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <Image source={require('../../assets/images/pally-logo.png')} style={styles.logo} contentFit="contain" accessibilityLabel="Pally" />
-          <Text style={styles.prompt} accessibilityRole="header">What do you need help with?</Text>
+    <Screen>
+      <View style={styles.header}>
+        <View style={styles.brand}>
+          <Image source={mascot} style={styles.logo} contentFit="contain" accessibilityLabel="Pally" />
+          <Text style={[styles.brandName, { color: c.teal }]}>Pally</Text>
         </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={() => router.push('/settings')} style={[styles.gear, { backgroundColor: c.card }]}>
+          <Text style={{ fontSize: 24, color: c.teal }}>⚙</Text>
+        </Pressable>
+      </View>
 
-        {/* Fixed mic zone: same place on every visit. */}
-        <View style={styles.micZone}>
-          <MicButton state={speech.listening ? 'listening' : 'idle'} onPress={speech.toggle} />
-          {speech.listening && speech.transcript ? <Text style={styles.heard} accessibilityLiveRegion="polite">“{speech.transcript}”</Text> : null}
-        </View>
+      <Text style={[styles.prompt, { color: c.tealDark }]} accessibilityRole="header">What do you need help with?</Text>
 
-        <View style={styles.footer}>
-          {speech.notice && (
-            <Notice title="Voice isn't working yet" tone="warn">
-              <Text style={styles.noticeText}>{speech.notice}</Text>
-              {speech.permission === 'blocked' || speech.permission === 'denied' ? (
-                <BigButton label="Open phone settings" variant="secondary" onPress={() => Linking.openSettings()} />
-              ) : null}
-            </Notice>
-          )}
-          <BigButton label="Type instead" variant="secondary" onPress={openAsk} />
+      <View style={styles.micZone}>
+        <MicButton state={speech.listening ? 'listening' : 'idle'} onPress={speech.toggle} />
+        {speech.listening && speech.transcript ? <Text style={styles.heard} accessibilityLiveRegion="polite">“{speech.transcript}”</Text> : null}
+      </View>
 
-          {ready && resumable && (
-            <Notice title="You have a task in progress" tone="good">
-              <Text style={styles.noticeText}>{resumable.state.task.title}</Text>
-              <BigButton
-                label="Continue where I left off"
-                onPress={() => {
-                  resume();
-                  router.push('/guide');
-                }}
-              />
-              <BigButton label="Not now, start fresh" variant="secondary" onPress={discardResumable} />
-            </Notice>
-          )}
+      {speech.notice && (
+        <Notice title="Voice isn't working yet" tone="warn">
+          <Text style={styles.noticeText}>{speech.notice}</Text>
+          {speech.permission === 'blocked' || speech.permission === 'denied' ? (
+            <BigButton label="Open phone settings" variant="secondary" onPress={() => Linking.openSettings()} />
+          ) : null}
+        </Notice>
+      )}
 
-          {recent && !resumable && (
-            <Text style={styles.recent}>Last time: {recent.title}</Text>
-          )}
+      {ready && resumable && (
+        <Notice title="You have a task in progress" tone="good">
+          <Text style={styles.noticeText}>{resumable.state.task.title}</Text>
+          <BigButton label="Continue where I left off" onPress={() => { resume(); router.push('/guide'); }} />
+          <BigButton label="Not now, start fresh" variant="secondary" onPress={discardResumable} />
+        </Notice>
+      )}
+      {recent && !resumable && <Text style={styles.recent}>Last time: {recent.title}</Text>}
 
-          <View style={styles.row}>
-            <BigButton label="Past help" variant="secondary" style={styles.half} onPress={() => router.push('/history')} />
-            <BigButton label="Settings" variant="secondary" style={styles.half} onPress={() => router.push('/settings')} />
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      <View style={styles.cards}>
+        {cards.map((k) => (
+          <Pressable key={k.label} accessibilityRole="button" accessibilityLabel={k.label} onPress={k.go} style={({ pressed }) => [styles.card, { backgroundColor: c.card }, pressed && { opacity: 0.8 }]}>
+            <Text style={{ fontSize: 28, color: c.teal }}>{k.glyph}</Text>
+            <Text style={[styles.cardLabel, { color: c.tealDark }]}>{k.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Check something suspicious" onPress={() => router.push('/safety')} style={[styles.safety, { backgroundColor: c.card }]}>
+        <Text style={{ fontSize: 22, color: c.teal }}>⛨</Text>
+        <Text style={[styles.cardLabel, { color: c.tealDark }]}>Check something suspicious</Text>
+      </Pressable>
+      <Text style={[styles.footer, { color: c.teal }]}>♡ Always here to help</Text>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream },
-  scroll: { padding: 24, gap: 16, flexGrow: 1 },
-  header: { alignItems: 'center', gap: 8 },
-  logo: { width: 160, height: 100 },
-  prompt: { fontSize: 30, fontWeight: '900', color: colors.teal, textAlign: 'center' },
-  micZone: { minHeight: 330, alignItems: 'center', justifyContent: 'flex-start', gap: 8 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logo: { width: 52, height: 52, borderRadius: 12 },
+  brandName: { fontSize: 30, fontWeight: '900' },
+  gear: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  prompt: { fontSize: 32, fontWeight: '900', textAlign: 'center', lineHeight: 40 },
+  micZone: { alignItems: 'center', minHeight: 290, justifyContent: 'center' },
   heard: { fontSize: 22, fontStyle: 'italic', color: colors.text, textAlign: 'center' },
-  footer: { gap: 14 },
-  noticeText: { fontSize: 20, lineHeight: 29, color: colors.text },
-  recent: { fontSize: 20, color: colors.text, textAlign: 'center' },
-  row: { flexDirection: 'row', gap: 12 },
-  half: { flex: 1, paddingHorizontal: 8 },
+  noticeText: { fontSize: 19, lineHeight: 28, color: colors.text },
+  recent: { fontSize: 18, color: colors.muted, textAlign: 'center' },
+  cards: { flexDirection: 'row', gap: 10 },
+  card: { flex: 1, minHeight: 92, borderRadius: 22, alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6 },
+  cardLabel: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  safety: { minHeight: 64, borderRadius: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, elevation: 2 },
+  footer: { fontSize: 18, fontWeight: '800', textAlign: 'center', marginTop: 4, marginBottom: 40 },
 });

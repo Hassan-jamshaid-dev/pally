@@ -1,7 +1,9 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/presentation/components/app-text';
+import { Mascot, Screen } from '@/presentation/components/screen';
+import { useTheme } from '@/presentation/use-theme';
 import { friendlyAiError } from '@/ai/client';
 import { colors } from '@/constants/theme';
 import { parseCommand } from '@/guidance/commands';
@@ -17,6 +19,7 @@ import { useSpeechInput } from '@/voice/useSpeechInput';
 
 export default function Guide() {
   const router = useRouter();
+  const { c } = useTheme();
   const { session, dispatch, clarify, prefs, updatePrefs, endSession } = usePally();
   const [speaking, setSpeaking] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -117,45 +120,59 @@ export default function Guide() {
   };
 
   // ---- Terminal / interrupt screens ----
+  const Plain = ({ children, title }: { children: React.ReactNode; title?: string }) => (
+    <Screen title={title} onBack={leave} back={!!title}>{children}</Screen>
+  );
   if (g.status === 'blocked') {
     return (
-      <Screen>
+      <Plain>
         <Notice title="Let's not do that" tone="danger">{g.warning ?? SCAM_TIP}</Notice>
         <BigButton label="Back to home" onPress={leave} />
-      </Screen>
+      </Plain>
     );
   }
   if (g.status === 'stopped') {
     return (
-      <Screen>
+      <Plain>
         <Notice title="We stopped" tone="info">Okay. Nothing else was changed. You can ask me again any time.</Notice>
-        <BigButton label="Ask something else" onPress={() => { endSession(); router.replace('/ask'); }} />
-        <BigButton label="Back to home" variant="secondary" onPress={leave} />
-      </Screen>
+        <BigButton label="Ask Another Question" onPress={() => { endSession(); router.replace('/ask'); }} />
+        <BigButton label="Return Home" variant="secondary" onPress={leave} />
+      </Plain>
     );
   }
   if (g.status === 'complete') {
     return (
-      <Screen>
-        <Notice title="All done. Well done!" tone="good">
+      <Plain>
+        <View style={styles.center}>
+          <Mascot size={160} />
+          <Text style={[styles.big, { color: c.tealDark }]} accessibilityRole="header">You're all done!</Text>
           <Text style={styles.body}>{g.task.title}</Text>
-          <Text style={styles.small}>Saved to “Past help” on this phone.</Text>
-        </Notice>
-        <BigButton label="Ask something else" variant="warm" onPress={() => { endSession(); router.replace('/ask'); }} />
-        <BigButton label="Back to home" variant="secondary" onPress={leave} />
-      </Screen>
+          <Text style={styles.small}>Saved to “Past Help” on this phone.</Text>
+        </View>
+        <BigButton label="Return Home" onPress={leave} />
+        <BigButton
+          label="Repeat Steps"
+          variant="secondary"
+          onPress={() => {
+            const q = session.question;
+            endSession();
+            router.replace({ pathname: '/ask', params: { q } });
+          }}
+        />
+        <BigButton label="Ask Another Question" variant="secondary" onPress={() => { endSession(); router.replace('/ask'); }} />
+      </Plain>
     );
   }
   if (g.status === 'task_warning') {
     return (
-      <Screen>
+      <Plain>
         <Notice title="Please be careful" tone="danger">
           <Text style={styles.body}>{g.warning ?? SCAM_TIP}</Text>
           {g.safety.scamSignals.length > 0 && <Text style={styles.small}>Warning signs: {g.safety.scamSignals.map((s) => s.replace(/_/g, ' ')).join(', ')}.</Text>}
         </Notice>
         <BigButton label="Stop here" variant="danger" onPress={actions.stop} />
         <BigButton label="I understand, show me the steps" variant="secondary" onPress={() => dispatch({ type: 'ack_warning' })} />
-      </Screen>
+      </Plain>
     );
   }
   if (!step) return <Redirect href="/home" />;
@@ -163,8 +180,12 @@ export default function Guide() {
   if (g.status === 'step_confirm' && g.gate) {
     const hard = g.gate.strength === 'hard';
     return (
-      <Screen>
-        <Notice title={g.gate.headline} tone={hard ? 'danger' : 'warn'}>
+      <Plain title="Confirm Action">
+        <View style={styles.center}>
+          <Text style={{ fontSize: 64, color: hard ? c.coralDark : c.coral }}>⚠</Text>
+          <Text style={[styles.big, { color: c.tealDark }]} accessibilityRole="header">{g.gate.headline}</Text>
+        </View>
+        <Notice tone={hard ? 'danger' : 'warn'}>
           <Text style={styles.body}>Next: {step.instruction}</Text>
           {g.gate.reasons.map((r) => (
             <Text key={r} style={styles.body}>• {r}</Text>
@@ -173,86 +194,82 @@ export default function Guide() {
         </Notice>
         {hard ? (
           <>
-            <BigButton label="No, stop" variant="danger" onPress={actions.stop} />
-            <BigButton label="Yes, I want to do this" variant="secondary" onPress={() => dispatch({ type: 'confirm' })} />
+            <BigButton label="Go Back" variant="danger" onPress={actions.stop} />
+            <BigButton label="Continue" variant="secondary" onPress={() => dispatch({ type: 'confirm' })} />
           </>
         ) : (
           <>
-            <BigButton label="Yes, go on" onPress={() => dispatch({ type: 'confirm' })} />
-            <BigButton label="No, stop" variant="secondary" onPress={actions.stop} />
+            <BigButton label="Continue" onPress={() => dispatch({ type: 'confirm' })} />
+            <BigButton label="Go Back" variant="secondary" onPress={actions.stop} />
           </>
         )}
         <BigButton label="Say it again" variant="secondary" onPress={actions.repeat} />
-      </Screen>
+      </Plain>
     );
   }
 
   // ---- Normal step ----
-  return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.progress} accessibilityLiveRegion="polite">{progressLabel(g)} · {g.task.title}</Text>
-        <View style={styles.stepCard}>
-          <Text style={styles.stepText} accessibilityRole="header">{step.instruction}</Text>
-        </View>
-        {busy && <Notice tone="info">Pally is finding a simpler way to say it…</Notice>}
-        {error && <Notice title="Couldn't do that" tone="warn">{error}</Notice>}
-        {heardNote && <Text style={styles.small}>{heardNote}</Text>}
-        {speech.notice && <Notice tone="warn">{speech.notice}</Notice>}
-        {helpOpen && (
-          <HelpPanel
-            step={step}
-            pace={prefs.pace}
-            busy={busy}
-            onTogglePace={() => updatePrefs({ pace: prefs.pace === 'slow' ? 'normal' : 'slow' }).then(actions.repeat)}
-            onNotFound={() => actions.explain('step_not_found')}
-            onWrong={() => actions.explain('wrong_answer')}
-            onClose={() => setHelpOpen(false)}
-          />
-        )}
-      </ScrollView>
-
-      {/* Fixed footer: mic is always in the same place. */}
-      <View style={styles.footer}>
-        <View style={styles.topRow}>
-          <MicButton compact hideLabel state={micState} onPress={onMic} />
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={styles.micLabel}>{speech.listening ? (speech.transcript || 'Listening…') : speaking ? 'Pally is talking' : 'Say “next” or tap'}</Text>
-            <BigButton label="Next ›" onPress={actions.next} disabled={busy} />
-          </View>
-        </View>
-        <View style={styles.row}>
-          <BigButton label="Repeat" variant="secondary" style={styles.half} onPress={actions.repeat} />
-          <BigButton label="Explain differently" variant="secondary" style={styles.half} onPress={() => actions.explain()} disabled={busy} />
-        </View>
-        <View style={styles.row}>
-          <BigButton label={helpOpen ? 'Hide help' : 'Help'} variant="warm" style={styles.half} onPress={() => setHelpOpen((o) => !o)} />
-          <BigButton label="Stop" variant="danger" style={styles.half} onPress={actions.stop} />
+  const total = g.steps.length;
+  const pct = total ? Math.min(1, (g.index + 1) / total) : 0;
+  const footer = (
+    <View style={[styles.footer, { backgroundColor: c.cream }]}>
+      <View style={styles.row}>
+        <BigButton label="‹ Back" variant="secondary" style={styles.half} onPress={() => dispatch({ type: 'previous' })} disabled={busy || g.index === 0} />
+        <BigButton label="Next ›" style={styles.half} onPress={actions.next} disabled={busy} />
+      </View>
+      <View style={styles.row}>
+        <BigButton label="Listen" variant="secondary" style={styles.half} onPress={actions.repeat} />
+        <BigButton label={helpOpen ? 'Hide help' : "I don't see that"} variant="warm" style={styles.half} onPress={() => setHelpOpen((o) => !o)} />
+      </View>
+      <View style={styles.row}>
+        <MicButton compact hideLabel state={micState} onPress={onMic} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.micLabel}>{speech.listening ? (speech.transcript || 'Listening…') : speaking ? 'Pally is talking' : 'Say “next” or tap'}</Text>
+          <BigButton label="Stop" variant="danger" onPress={actions.stop} />
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
-}
-
-function Screen({ children }: { children: React.ReactNode }) {
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <ScrollView contentContainerStyle={[styles.content, { gap: 14 }]}>{children}</ScrollView>
-    </SafeAreaView>
+    <Screen title={g.task.title} waves={false} footer={footer}>
+      <Text style={styles.progress} accessibilityLiveRegion="polite">{progressLabel(g)}</Text>
+      <View style={[styles.bar, { backgroundColor: c.greenSoft }]}><View style={[styles.barFill, { width: `${pct * 100}%`, backgroundColor: c.teal }]} /></View>
+      <View style={[styles.stepCard, { backgroundColor: c.card }]}>
+        <Text style={[styles.stepText, { color: c.tealDark }]} accessibilityRole="header">{step.instruction}</Text>
+      </View>
+      <BigButton label="Explain differently" variant="secondary" onPress={() => actions.explain()} disabled={busy} />
+      {busy && <Notice tone="info">Pally is finding a simpler way to say it…</Notice>}
+      {error && <Notice title="Couldn't do that" tone="warn">{error}</Notice>}
+      {heardNote && <Text style={styles.small}>{heardNote}</Text>}
+      {speech.notice && <Notice tone="warn">{speech.notice}</Notice>}
+      {helpOpen && (
+        <HelpPanel
+          step={step}
+          pace={prefs.pace}
+          busy={busy}
+          onTogglePace={() => updatePrefs({ pace: prefs.pace === 'slow' ? 'normal' : 'slow' }).then(actions.repeat)}
+          onNotFound={() => actions.explain('step_not_found')}
+          onWrong={() => actions.explain('wrong_answer')}
+          onClose={() => setHelpOpen(false)}
+        />
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.cream },
-  content: { padding: 20, gap: 14 },
-  progress: { fontSize: 20, fontWeight: '800', color: colors.coralDark },
-  stepCard: { backgroundColor: colors.white, borderWidth: 3, borderColor: colors.teal, borderRadius: 24, padding: 22 },
-  stepText: { fontSize: 32, lineHeight: 44, fontWeight: '800', color: colors.tealDark },
-  body: { fontSize: 22, lineHeight: 31, color: colors.text },
-  small: { fontSize: 17, lineHeight: 24, color: '#3C5654' },
-  footer: { padding: 16, paddingTop: 8, gap: 10, backgroundColor: colors.cream, borderTopWidth: 2, borderTopColor: colors.greenSoft },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  micLabel: { fontSize: 18, fontWeight: '700', color: colors.teal },
-  row: { flexDirection: 'row', gap: 10 },
+  center: { alignItems: 'center', gap: 10 },
+  big: { fontSize: 32, fontWeight: '900', textAlign: 'center' },
+  progress: { fontSize: 18, fontWeight: '800', color: colors.coralDark },
+  bar: { height: 10, borderRadius: 5, overflow: 'hidden' },
+  barFill: { height: 10, borderRadius: 5 },
+  stepCard: { borderRadius: 26, padding: 22, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8 },
+  stepText: { fontSize: 30, lineHeight: 42, fontWeight: '800' },
+  body: { fontSize: 20, lineHeight: 29, color: colors.text },
+  small: { fontSize: 16, lineHeight: 23, color: colors.muted },
+  footer: { padding: 14, paddingTop: 8, gap: 8 },
+  micLabel: { fontSize: 16, fontWeight: '700', color: colors.teal, marginBottom: 4 },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   half: { flex: 1, paddingHorizontal: 6 },
 });
+
