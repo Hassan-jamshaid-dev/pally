@@ -1,15 +1,16 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText as Text } from '@/presentation/components/app-text';
-import { Mascot, Screen } from '@/presentation/components/screen';
+import { HeaderButton, Mascot, Screen, mascot } from '@/presentation/components/screen';
 import { useTheme } from '@/presentation/use-theme';
 import { friendlyAiError } from '@/ai/client';
 import { colors } from '@/constants/theme';
 import { parseCommand } from '@/guidance/commands';
 import { currentStep, progressLabel } from '@/guidance/engine';
 import { BigButton } from '@/presentation/components/big-button';
-import { MicButton } from '@/presentation/components/mic-button';
+import { ChatBar } from '@/presentation/components/chat-bar';
 import { Notice } from '@/presentation/components/notice';
 import { HelpPanel } from '@/presentation/help-panel';
 import { usePally } from '@/presentation/pally-context';
@@ -25,6 +26,7 @@ export default function Guide() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [followUp, setFollowUp] = useState('');
   const [heardNote, setHeardNote] = useState<string | null>(null);
 
   const g = session?.guidance;
@@ -112,6 +114,14 @@ export default function Guide() {
       return;
     }
     return speech.toggle();
+  };
+
+  const askFollowUp = () => {
+    const q = followUp.trim();
+    if (!q) return;
+    stopSpeaking();
+    endSession();
+    router.replace({ pathname: '/ask', params: { q, auto: '1' } });
   };
 
   const leave = () => {
@@ -208,36 +218,65 @@ export default function Guide() {
     );
   }
 
-  // ---- Normal step ----
+  // ---- Normal step: chat-style ----
   const total = g.steps.length;
-  const pct = total ? Math.min(1, (g.index + 1) / total) : 0;
+  const total1 = Math.max(total, 1);
+  const stepNo = Math.min(g.index + 1, total1);
   const footer = (
     <View style={[styles.footer, { backgroundColor: c.cream }]}>
       <View style={styles.row}>
         <BigButton label="‹ Back" variant="secondary" style={styles.half} onPress={() => dispatch({ type: 'previous' })} disabled={busy || g.index === 0} />
         <BigButton label="Next ›" style={styles.half} onPress={actions.next} disabled={busy} />
       </View>
-      <View style={styles.row}>
-        <BigButton label="Listen" variant="secondary" style={styles.half} onPress={actions.repeat} />
-        <BigButton label={helpOpen ? 'Hide help' : "I don't see that"} variant="warm" style={styles.half} onPress={() => setHelpOpen((o) => !o)} />
-      </View>
-      <View style={styles.row}>
-        <MicButton compact hideLabel state={micState} onPress={onMic} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.micLabel}>{speech.listening ? (speech.transcript || 'Listening…') : speaking ? 'Pally is talking' : 'Say “next” or tap'}</Text>
-          <BigButton label="Stop" variant="danger" onPress={actions.stop} />
-        </View>
-      </View>
+      <ChatBar
+        value={speech.listening ? speech.transcript : followUp}
+        onChangeText={setFollowUp}
+        onSubmit={askFollowUp}
+        placeholder={speech.listening ? 'Listening…' : speaking ? 'Pally is talking…' : 'Ask a follow-up...'}
+        accessibilityLabel="Ask a follow-up question, or say next, repeat, or stop"
+        micState={micState}
+        onMic={onMic}
+      />
     </View>
   );
   return (
-    <Screen title={g.task.title} waves={false} footer={footer}>
-      <Text style={styles.progress} accessibilityLiveRegion="polite">{progressLabel(g)}</Text>
-      <View style={[styles.bar, { backgroundColor: c.greenSoft }]}><View style={[styles.barFill, { width: `${pct * 100}%`, backgroundColor: c.teal }]} /></View>
-      <View style={[styles.stepCard, { backgroundColor: c.card }]}>
-        <Text style={[styles.stepText, { color: c.tealDark }]} accessibilityRole="header">{step.instruction}</Text>
+    <Screen
+      brand
+      back
+      onBack={leave}
+      right={<HeaderButton glyph="⋮" label="Menu" onPress={() => router.push('/menu')} />}
+      waves={false}
+      footer={footer}>
+      <View style={[styles.userBubble, { backgroundColor: c.teal }]}>
+        <Text style={styles.userText}>{session.question}</Text>
       </View>
-      <BigButton label="Explain differently" variant="secondary" onPress={() => actions.explain()} disabled={busy} />
+      <View style={styles.pallyRow}>
+        <Image source={mascot} style={styles.avatar} contentFit="contain" />
+        <View style={[styles.pallyBubble, { backgroundColor: c.greenSoft }]}>
+          <Text style={styles.pallyText}>{stepNo === 1 ? "Of course! Let's do it together." : 'Nice! Here is the next step.'}</Text>
+        </View>
+      </View>
+
+      <View style={[styles.stepCard, { backgroundColor: c.card }]}>
+        <View style={[styles.pill, { backgroundColor: c.greenSoft }]}>
+          <Text style={[styles.pillText, { color: c.tealDark }]} accessibilityLiveRegion="polite">{progressLabel(g)}</Text>
+        </View>
+        <Text style={[styles.stepText, { color: c.tealDark }]} accessibilityRole="header">{step.instruction}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Read this step aloud" onPress={actions.repeat} style={styles.takeTime}>
+          <Text style={{ fontSize: 22, color: c.teal }}>🔊</Text>
+          <Text style={styles.small}>Take your time.</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.row}>
+        <Chip glyph="↻" label="Repeat" onPress={actions.repeat} />
+        <Chip glyph="💡" label="Explain differently" onPress={() => actions.explain()} disabled={busy} />
+      </View>
+      <View style={styles.row}>
+        <Chip glyph="?" label={helpOpen ? 'Hide help' : "I don't see that"} onPress={() => setHelpOpen((o) => !o)} />
+        <Chip glyph="■" label="Stop" onPress={actions.stop} />
+      </View>
+
       {busy && <Notice tone="info">Pally is finding a simpler way to say it…</Notice>}
       {error && <Notice title="Couldn't do that" tone="warn">{error}</Notice>}
       {heardNote && <Text style={styles.small}>{heardNote}</Text>}
@@ -257,19 +296,35 @@ export default function Guide() {
   );
 }
 
+function Chip({ glyph, label, onPress, disabled }: { glyph: string; label: string; onPress: () => void; disabled?: boolean }) {
+  const { c, target } = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.chip, { backgroundColor: c.card, minHeight: target, borderColor: c.sage }, disabled && { opacity: 0.45 }]}>
+      <Text style={{ fontSize: 20, color: c.teal }}>{glyph}</Text>
+      <Text style={[styles.chipText, { color: c.tealDark }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   center: { alignItems: 'center', gap: 10 },
   big: { fontSize: 32, fontWeight: '900', textAlign: 'center' },
-  progress: { fontSize: 18, fontWeight: '800', color: colors.coralDark },
-  bar: { height: 10, borderRadius: 5, overflow: 'hidden' },
-  barFill: { height: 10, borderRadius: 5 },
-  stepCard: { borderRadius: 26, padding: 22, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8 },
-  stepText: { fontSize: 30, lineHeight: 42, fontWeight: '800' },
   body: { fontSize: 20, lineHeight: 29, color: colors.text },
-  small: { fontSize: 16, lineHeight: 23, color: colors.muted },
-  footer: { padding: 14, paddingTop: 8, gap: 8 },
-  micLabel: { fontSize: 16, fontWeight: '700', color: colors.teal, marginBottom: 4 },
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  small: { fontSize: 17, lineHeight: 23, color: colors.muted },
+  userBubble: { alignSelf: 'flex-end', maxWidth: '82%', borderRadius: 22, borderBottomRightRadius: 6, paddingHorizontal: 18, paddingVertical: 14 },
+  userText: { color: '#FFFFFF', fontSize: 19, lineHeight: 26 },
+  pallyRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  avatar: { width: 48, height: 48, borderRadius: 14 },
+  pallyBubble: { flexShrink: 1, borderRadius: 22, borderBottomLeftRadius: 6, paddingHorizontal: 18, paddingVertical: 14 },
+  pallyText: { fontSize: 19, lineHeight: 26, color: colors.text },
+  stepCard: { borderRadius: 28, padding: 20, gap: 12, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8 },
+  pill: { alignSelf: 'flex-start', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 },
+  pillText: { fontSize: 16, fontWeight: '800' },
+  stepText: { fontSize: 28, lineHeight: 38, fontWeight: '800' },
+  takeTime: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
+  chip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 32, borderWidth: 2, paddingHorizontal: 10 },
+  chipText: { fontSize: 16, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
+  footer: { paddingTop: 8, gap: 2 },
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 0 },
   half: { flex: 1, paddingHorizontal: 6 },
 });
-

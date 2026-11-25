@@ -19,6 +19,8 @@ type Props = {
   compact?: boolean;
   /** Hide the text label under the button (e.g. when the screen shows its own status). */
   hideLabel?: boolean;
+  /** Explicit diameter (e.g. 64 for the input bar). Small sizes drop the halo and thick border. */
+  size?: number;
 };
 
 const BG: Record<MicState, string> = {
@@ -28,9 +30,11 @@ const BG: Record<MicState, string> = {
   speaking: colors.green,
 };
 
-export function MicButton({ state, onPress, compact, hideLabel }: Props) {
+export function MicButton({ state, onPress, compact, hideLabel, size: sizeProp }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
-  const size = compact ? 112 : 200;
+  const size = sizeProp ?? (compact ? 112 : 200);
+  const small = size < 100;
+  const iconScale = size * 0.0049;
 
   useEffect(() => {
     if (state === 'idle') {
@@ -56,8 +60,8 @@ export function MicButton({ state, onPress, compact, hideLabel }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <View style={{ width: size + 40, height: size + 40, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{ position: 'absolute', width: size + 36, height: size + 36, borderRadius: (size + 36) / 2, backgroundColor: colors.peach, opacity: 0.55 }} />
+      <View style={{ width: small ? size : size + 40, height: small ? size : size + 40, alignItems: 'center', justifyContent: 'center' }}>
+        {!small && <View style={{ position: 'absolute', width: size + 36, height: size + 36, borderRadius: (size + 36) / 2, backgroundColor: colors.peach, opacity: 0.55 }} />}
         <Animated.View style={[styles.ring, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg, opacity, transform: [{ scale }] }]} />
         <Pressable
           accessibilityRole="button"
@@ -68,9 +72,10 @@ export function MicButton({ state, onPress, compact, hideLabel }: Props) {
           style={({ pressed }) => [
             styles.mic,
             { width: size, height: size, borderRadius: size / 2, backgroundColor: bg },
+            small && { borderWidth: 0 },
             pressed && { opacity: 0.88 },
           ]}>
-          {state === 'speaking' ? <SpeakerIcon color={glyph} scale={compact ? 0.55 : 1} /> : <MicIcon color={glyph} scale={compact ? 0.55 : 1} />}
+          {state === 'speaking' ? <SpeakerIcon color={glyph} scale={iconScale} /> : <MicIcon color={glyph} scale={iconScale} />}
         </Pressable>
       </View>
       {!hideLabel && (

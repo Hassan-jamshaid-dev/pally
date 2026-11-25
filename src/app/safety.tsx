@@ -19,7 +19,7 @@ export default function Safety() {
   const tone = result?.level === 'likely_scam' ? 'danger' : result?.level === 'careful' ? 'warn' : 'good';
 
   return (
-    <Screen title="Check Something Suspicious" back tabs="safety">
+    <Screen title="Check Something Suspicious" back>
       <View style={styles.hero}>
         <Text style={{ fontSize: 56, color: c.teal }}>⛨</Text>
         <Text style={[styles.h, { color: c.tealDark }]} accessibilityRole="header">Does something seem unusual?</Text>

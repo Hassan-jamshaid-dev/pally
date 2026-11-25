@@ -36,7 +36,7 @@ export default function Settings() {
   const sttOk = isSttSupported();
 
   return (
-    <Screen title="Settings" back tabs="settings">
+    <Screen title="Settings" back tabs="settings">`n      <Section title="Safety and help">`n        <BigButton label="Check something suspicious" variant="secondary" onPress={() => router.push('/safety')} />`n        <BigButton label="About Pally" variant="secondary" onPress={() => router.push('/about')} />`n      </Section>`n
       <Section title="Voice">
         <View style={styles.line}>
           <Text style={styles.body}>Read steps aloud</Text>

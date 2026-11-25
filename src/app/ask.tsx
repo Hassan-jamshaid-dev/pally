@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { AppText as Text } from '@/presentation/components/app-text';
-import { Mascot, Screen } from '@/presentation/components/screen';
+import { HeaderButton, Mascot, Screen } from '@/presentation/components/screen';
 import { useTheme } from '@/presentation/use-theme';
 import { friendlyAiError } from '@/ai/client';
 import { colors } from '@/constants/theme';
@@ -16,7 +16,7 @@ import { useSpeechInput } from '@/voice/useSpeechInput';
 export default function Ask() {
   const router = useRouter();
   const { c } = useTheme();
-  const { q } = useLocalSearchParams<{ q?: string }>();
+  const { q, auto } = useLocalSearchParams<{ q?: string; auto?: string }>();
   const { startTask } = usePally();
   const [text, setText] = useState(typeof q === 'string' ? q : '');
   const [verdict, setVerdict] = useState<RequestVerdict>({ kind: 'ok' });
@@ -42,7 +42,18 @@ export default function Ask() {
     if (v.kind === 'ok') run();
   };
 
-  const edit = (t: string) => {
+  // Suggested questions / home bar arrive with auto=1: run the same safety check + AI flow immediately.
+    const autoRan = useRef(false);
+    useEffect(() => {
+      if (autoRan.current || auto !== '1' || typeof q !== 'string' || !q.trim()) return;
+      autoRan.current = true;
+      const v = checkRequest(q);
+      setVerdict(v);
+      if (v.kind === 'ok') run();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+  
+    const edit = (t: string) => {
     setText(t);
     setVerdict({ kind: 'ok' });
     setError(null);
@@ -51,9 +62,9 @@ export default function Ask() {
   const shown = speech.listening && speech.transcript ? speech.transcript : text;
 
   return (
-    <Screen title="Ask Pally" back>
+    <Screen brand back right={<HeaderButton glyph="⋮" label="Menu" onPress={() => router.push('/menu')} />}>
       <View style={{ alignItems: 'center', gap: 6 }}>
-        <Mascot size={120} />
+        <Mascot size={150} />
         <Text style={[styles.label, { color: c.tealDark }]} accessibilityRole="header">What would you like help with?</Text>
       </View>
       <View style={styles.inputRow}>

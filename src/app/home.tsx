@@ -1,46 +1,50 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { colors } from '@/constants/theme';
 import { AppText as Text } from '@/presentation/components/app-text';
 import { BigButton } from '@/presentation/components/big-button';
-import { MicButton } from '@/presentation/components/mic-button';
+import { ChatBar } from '@/presentation/components/chat-bar';
 import { Notice } from '@/presentation/components/notice';
-import { Mascot, Screen, mascot } from '@/presentation/components/screen';
+import { HeaderButton, Mascot, Screen } from '@/presentation/components/screen';
 import { usePally } from '@/presentation/pally-context';
 import { useTheme } from '@/presentation/use-theme';
 import { useSpeechInput } from '@/voice/useSpeechInput';
 
+/** Suggested questions go straight into the normal ask → safety check → guidance flow. */
+const SUGGESTIONS = [
+  { glyph: '📷', question: 'How do I send a photo?' },
+  { glyph: 'Aa', question: 'How do I make text bigger?' },
+  { glyph: '📶', question: 'How do I connect to Wi-Fi?' },
+] as const;
+
 export default function Home() {
   const router = useRouter();
   const { c } = useTheme();
-  const { resumable, resume, discardResumable, history, ready } = usePally();
-  const speech = useSpeechInput((text) => router.push({ pathname: '/ask', params: { q: text } }));
-  const recent = history[0];
+  const { resumable, resume, discardResumable, ready } = usePally();
+  const [text, setText] = useState('');
+  const ask = (q: string) => router.push({ pathname: '/ask', params: { q, auto: '1' } });
+  const speech = useSpeechInput((heard) => ask(heard));
+  const send = () => text.trim() && ask(text.trim());
 
-  const cards = [
-    { label: 'Past Help', glyph: '↺', go: () => router.push('/history') },
-    { label: 'Settings', glyph: '⚙', go: () => router.push('/settings') },
-    { label: 'Type Instead', glyph: '⌨', go: () => router.push('/ask') },
-  ];
+  const footer = (
+    <ChatBar
+      value={speech.listening && speech.transcript ? speech.transcript : text}
+      onChangeText={setText}
+      onSubmit={send}
+      placeholder="Type or speak to Pally..."
+      accessibilityLabel="Type your question for Pally"
+      micState={speech.listening ? 'listening' : 'idle'}
+      onMic={speech.toggle}
+    />
+  );
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <View style={styles.brand}>
-          <Image source={mascot} style={styles.logo} contentFit="contain" accessibilityLabel="Pally" />
-          <Text style={[styles.brandName, { color: c.teal }]}>Pally</Text>
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={() => router.push('/settings')} style={[styles.gear, { backgroundColor: c.card }]}>
-          <Text style={{ fontSize: 24, color: c.teal }}>⚙</Text>
-        </Pressable>
-      </View>
-
-      <Text style={[styles.prompt, { color: c.tealDark }]} accessibilityRole="header">What do you need help with?</Text>
-
-      <View style={styles.micZone}>
-        <MicButton state={speech.listening ? 'listening' : 'idle'} onPress={speech.toggle} />
-        {speech.listening && speech.transcript ? <Text style={styles.heard} accessibilityLiveRegion="polite">“{speech.transcript}”</Text> : null}
+    <Screen brand right={<HeaderButton glyph="⚙" label="Settings" onPress={() => router.push('/settings')} />} tabs="home" footer={footer}>
+      <View style={styles.hero}>
+        <Text style={[styles.hello, { color: c.tealDark }]} accessibilityRole="header">Hello!{'\n'}How can I help?</Text>
+        <Text style={styles.sub}>Ask me anything about using your phone.</Text>
+        <Mascot size={190} />
       </View>
 
       {speech.notice && (
@@ -59,39 +63,38 @@ export default function Home() {
           <BigButton label="Not now, start fresh" variant="secondary" onPress={discardResumable} />
         </Notice>
       )}
-      {recent && !resumable && <Text style={styles.recent}>Last time: {recent.title}</Text>}
 
-      <View style={styles.cards}>
-        {cards.map((k) => (
-          <Pressable key={k.label} accessibilityRole="button" accessibilityLabel={k.label} onPress={k.go} style={({ pressed }) => [styles.card, { backgroundColor: c.card }, pressed && { opacity: 0.8 }]}>
-            <Text style={{ fontSize: 28, color: c.teal }}>{k.glyph}</Text>
-            <Text style={[styles.cardLabel, { color: c.tealDark }]}>{k.label}</Text>
-          </Pressable>
+      <View style={[styles.card, { backgroundColor: c.card }]}>
+        <Text style={[styles.cardTitle, { color: c.tealDark }]} accessibilityRole="header">✦ Suggested Questions</Text>
+        {SUGGESTIONS.map((s) => (
+          <Row key={s.question} glyph={s.glyph} label={s.question} onPress={() => ask(s.question)} />
         ))}
+        <Row glyph="⛨" label="Is this message a scam?" onPress={() => router.push('/safety')} />
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Check something suspicious" onPress={() => router.push('/safety')} style={[styles.safety, { backgroundColor: c.card }]}>
-        <Text style={{ fontSize: 22, color: c.teal }}>⛨</Text>
-        <Text style={[styles.cardLabel, { color: c.tealDark }]}>Check something suspicious</Text>
-      </Pressable>
-      <Text style={[styles.footer, { color: c.teal }]}>♡ Always here to help</Text>
     </Screen>
   );
 }
 
+function Row({ glyph, label, onPress }: { glyph: string; label: string; onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.row, { borderTopColor: c.greenSoft }, pressed && { opacity: 0.7 }]}>
+      <Text style={[styles.glyph, { color: c.teal }]}>{glyph}</Text>
+      <Text style={[styles.rowText, { color: c.text }]}>{label}</Text>
+      <Text style={[styles.chev, { color: c.teal }]}>›</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logo: { width: 52, height: 52, borderRadius: 12 },
-  brandName: { fontSize: 30, fontWeight: '900' },
-  gear: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  prompt: { fontSize: 32, fontWeight: '900', textAlign: 'center', lineHeight: 40 },
-  micZone: { alignItems: 'center', minHeight: 290, justifyContent: 'center' },
-  heard: { fontSize: 22, fontStyle: 'italic', color: colors.text, textAlign: 'center' },
+  hero: { alignItems: 'center', gap: 6 },
+  hello: { fontSize: 36, fontWeight: '900', textAlign: 'center', lineHeight: 42 },
+  sub: { fontSize: 19, lineHeight: 26, color: colors.text, textAlign: 'center' },
   noticeText: { fontSize: 19, lineHeight: 28, color: colors.text },
-  recent: { fontSize: 18, color: colors.muted, textAlign: 'center' },
-  cards: { flexDirection: 'row', gap: 10 },
-  card: { flex: 1, minHeight: 92, borderRadius: 22, alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6 },
-  cardLabel: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  safety: { minHeight: 64, borderRadius: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, elevation: 2 },
-  footer: { fontSize: 18, fontWeight: '800', textAlign: 'center', marginTop: 4, marginBottom: 40 },
+  card: { borderRadius: 28, padding: 8, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8 },
+  cardTitle: { fontSize: 18, fontWeight: '800', paddingHorizontal: 14, paddingVertical: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 64, paddingHorizontal: 14, borderTopWidth: 1 },
+  glyph: { fontSize: 22, width: 34, textAlign: 'center', fontWeight: '800' },
+  rowText: { flex: 1, fontSize: 19, fontWeight: '600' },
+  chev: { fontSize: 30, fontWeight: '600' },
 });
