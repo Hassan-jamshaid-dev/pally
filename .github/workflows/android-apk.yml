@@ -1,0 +1,62 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "EXPO_PUBLIC_PALLY_API_URL baked into the APK (optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_PALLY_API_URL: ${{ inputs.api_url || vars.PALLY_API_URL || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Build release APK (debug-keystore signed, installable)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/*.apk out/pally.apk
+          ls -lh out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pally-apk
+          path: out/pally.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="apk-${{ github.run_number }}"
+          gh release create "$TAG" out/pally.apk \
+            --title "Pally APK #${{ github.run_number }}" \
+            --notes "Unsigned-for-store (debug keystore) APK. Enable 'Install unknown apps' to sideload. Commit ${{ github.sha }}."
